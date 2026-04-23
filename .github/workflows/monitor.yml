@@ -1,0 +1,42 @@
+name: SpaceX S-1 Monitor
+
+on:
+  schedule:
+    # Market-adjacent hours: 9 AM-6 PM ET, approximated as 13:00-22:59 UTC.
+    - cron: "*/5 13-22 * * 1-5"
+    # Overnight weekday checks.
+    - cron: "*/30 0-12,23 * * 1-5"
+    # Weekend checks.
+    - cron: "*/30 * * * 0,6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run monitor
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: python monitor.py
+
+      - name: Commit notification DB
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add notifications.db
+          git diff --staged --quiet || git commit -m "Update notification DB"
+          git push
